@@ -1,6 +1,6 @@
 // 1. استدعاء دوال Firebase الأساسية من الـ CDN
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, onSnapshot, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // 2. كود الـ Config الحقيقي بتاعك
@@ -13,17 +13,21 @@ const firebaseConfig = {
   appId: "1:1054720474892:web:1a9674a45893bb8189d329"
 };
 
-// تشغيل Firebase
+// تشغيل التطبيق الرئيسي
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// 🔥 إنشاء تطبيق فرعي مخصص لتسجيل التجار بدون إخراج الأدمن
+const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+const secondaryAuth = getAuth(secondaryApp);
+
 const ADMIN_EMAIL = "admin@naderstore.com";
 
-// 🔥 الرقم الموحد لجميع التجار والمنتجات في السيتسم بالكامل
+// الرقم الموحد لجميع التجار والمنتجات
 const GLOBAL_WHATSAPP = "201015409872";
 
-// متغيرات محلية لحفظ بيانات التاجر الحالي في الجلسة
+// متغيرات محلية لجلسة التاجر
 let currentMerchantId = localStorage.getItem('merchantId') || null;
 let currentMerchantName = localStorage.getItem('merchantName') || "تاجر نادر ستور";
 
@@ -56,7 +60,7 @@ function showScreen(screenName) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// تشغيل الأكواد وتجهيز الأزرار والـ Forms
+// تجهيز الأزرار والـ Forms عند تحميل الصفحة
 document.addEventListener("DOMContentLoaded", () => {
   
   const navLogin = document.getElementById('navLogin');
@@ -68,6 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeLoginBtn = document.getElementById('closeLoginBtn');
   const submitLoginBtn = document.getElementById('submitLoginBtn');
   const addProductSubmitBtn = document.getElementById('addProductSubmitBtn');
+  const addMerchantSubmitBtn = document.getElementById('addMerchantSubmitBtn');
 
   // فتح نافذة تسجيل الدخول
   if(navLogin) {
@@ -85,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if(navStore) navStore.addEventListener('click', () => showScreen('store'));
   if(hamburgerMenu && navActions) hamburgerMenu.addEventListener('click', () => navActions.classList.toggle('mobile-open'));
 
-  // تنفيذ الدخول وحفظ البيانات أوتوماتيك
+  // تنفيذ الدخول
   if(submitLoginBtn) {
     submitLoginBtn.addEventListener('click', async () => {
       const email = document.getElementById('loginEmail').value.trim();
@@ -133,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // تسجيل الخروج ومسح بيانات الجلسة
+  // تسجيل الخروج
   if(navLogout) {
     navLogout.addEventListener('click', () => {
       signOut(auth).then(() => {
@@ -144,7 +149,63 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ===================== [إضافة منتج جديد - بالرقم الموحد] =====================
+  // ===================== [إضافة تاجر جديد - النسخة الأوتوماتيكية الكاملة] =====================
+  if(addMerchantSubmitBtn) {
+    addMerchantSubmitBtn.addEventListener('click', async () => {
+      const name = document.getElementById('newMerchantName').value.trim();
+      const email = document.getElementById('newMerchantEmail').value.trim();
+      const password = document.getElementById('newMerchantPassword').value;
+
+      if (!name || !email || !password) {
+        showToast("يرجى ملء جميع حقول التاجر *", true);
+        return;
+      }
+
+      try {
+        addMerchantSubmitBtn.disabled = true;
+        addMerchantSubmitBtn.textContent = "جاري إنشاء الحساب...";
+
+        // 1. إنشاء الحساب في الـ Auth باستخدام التطبيق الفرعي (حتى لا يخرج الأدمن)
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        const newMerchantUser = userCredential.user;
+        const merchantUid = newMerchantUser.uid;
+
+        // 2. تسجيل بيانات التاجر في الـ Firestore باستخدام الـ UID الحقيقي بتاعه فوراً
+        await setDoc(doc(db, "merchants", merchantUid), {
+          id: merchantUid,
+          name: name,
+          email: email,
+          password: password, // اختياري للعلم فقط
+          whatsapp: GLOBAL_WHATSAPP,
+          createdAt: new Date().toISOString()
+        });
+
+        // 3. تسجيل خروج تلقائي للتطبيق الفرعي حتى ينظف الذاكرة ولا يتدخل في التطبيق الرئيسي
+        await signOut(secondaryAuth);
+
+        showToast(`تم إنشاء حساب التاجر (${name}) بنجاح وبشكل تلقائي! 🎉`);
+        
+        // تفريغ الحقول
+        document.getElementById('newMerchantName').value = '';
+        document.getElementById('newMerchantEmail').value = '';
+        document.getElementById('newMerchantPassword').value = '';
+        if(document.getElementById('newMerchantWhatsapp')) document.getElementById('newMerchantWhatsapp').value = '';
+
+      } catch (error) {
+        console.error("خطأ إنشاء التاجر:", error);
+        if(error.code === 'auth/email-already-in-use') {
+          showToast("هذا الإيميل مسجل بالفعل في فايربيز!", true);
+        } else {
+          showToast("فشل إضافة التاجر، راجع الـ Console أو الـ Rules", true);
+        }
+      } finally {
+        addMerchantSubmitBtn.disabled = false;
+        addMerchantSubmitBtn.textContent = "إضافة التاجر ←";
+      }
+    });
+  }
+
+  // ===================== [إضافة منتج جديد] =====================
   if(addProductSubmitBtn) {
     addProductSubmitBtn.addEventListener('click', async () => {
       const name = document.getElementById('newProductName').value.trim();
@@ -172,7 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
           stock: stock,
           merchantId: mId,
           merchantName: currentMerchantName,
-          merchantWhatsapp: GLOBAL_WHATSAPP, // حفظ الرقم الموحد مع المنتج
+          merchantWhatsapp: GLOBAL_WHATSAPP, 
           createdAt: new Date().toISOString()
         });
 
@@ -287,7 +348,7 @@ function listenToMerchants() {
   });
 }
 
-// دالة مراقبة منتجات التاجر نفسه داخل لوحته
+// دالة مراقبة منتجات التاجر
 function listenToMerchantProducts(merchantId) {
   const q = query(collection(db, "products"), where("merchantId", "==", merchantId));
   const list = document.getElementById('merchantProductsList');
@@ -315,7 +376,7 @@ function listenToMerchantProducts(merchantId) {
       `;
 
       div.querySelector('button').addEventListener('click', async () => {
-        if(confirm("هل تريد حذف هذا...؟")) {
+        if(confirm("هل تريد حذف هذا المنتج؟")) {
           await deleteDoc(doc(db, "products", docSnap.id));
           showToast("تم حذف المنتج");
         }
@@ -326,7 +387,7 @@ function listenToMerchantProducts(merchantId) {
   });
 }
 
-// مراقبة المنتجات والمعرض العام للزبائن
+// مراقبة المنتجات والمعرض العام
 let allProducts = [];
 onSnapshot(collection(db, "products"), (snapshot) => {
   allProducts = [];
@@ -336,7 +397,6 @@ onSnapshot(collection(db, "products"), (snapshot) => {
   renderProductsList(allProducts);
 });
 
-// رص كروت المنتجات بالرابط الموحد للأبد
 function renderProductsList(products) {
   const grid = document.getElementById('productsGrid');
   const countBadge = document.getElementById('productCount');
@@ -356,7 +416,6 @@ function renderProductsList(products) {
     const card = document.createElement('div');
     card.className = "card-glass rounded-2xl overflow-hidden shadow-lg flex flex-col";
     
-    // إجبار النظام على استخدام الرقم الموحد لجميع كروت المنتجات المعروضة
     const whatsappMessage = encodeURIComponent(`أهلاً، أريد شراء منتج: ${p.name} المعروض على Nader Store بسعر ${p.price} ج.م`);
     
     card.innerHTML = `
@@ -381,45 +440,8 @@ function renderProductsList(products) {
   });
 }
 
-// دالة إضافة تاجر جديد من لوحة الأدمن
+// البحث السريع
 document.addEventListener("DOMContentLoaded", () => {
-  const addMerchantSubmitBtn = document.getElementById('addMerchantSubmitBtn');
-  if(addMerchantSubmitBtn) {
-    addMerchantSubmitBtn.addEventListener('click', async () => {
-      const name = document.getElementById('newMerchantName').value.trim();
-      const email = document.getElementById('newMerchantEmail').value.trim();
-      const password = document.getElementById('newMerchantPassword').value;
-
-      if (!name || !email || !password) {
-        showToast("يرجى ملء الحقول الأساسية", true);
-        return;
-      }
-
-      try {
-        addMerchantSubmitBtn.disabled = true;
-        const merchantId = "vendor_" + Date.now();
-        await setDoc(doc(db, "merchants", merchantId), {
-          id: merchantId,
-          name: name,
-          email: email,
-          password: password,
-          whatsapp: GLOBAL_WHATSAPP, // إجبار ربط حساب التاجر بالرقم الموحد أيضاً
-          createdAt: new Date().toISOString()
-        });
-        showToast("تم إضافة التاجر بنجاح ✓");
-        document.getElementById('newMerchantName').value = '';
-        document.getElementById('newMerchantEmail').value = '';
-        document.getElementById('newMerchantPassword').value = '';
-        if(document.getElementById('newMerchantWhatsapp')) document.getElementById('newMerchantWhatsapp').value = '';
-      } catch (error) {
-        showToast("حدث خطأ", true);
-      } finally {
-        addMerchantSubmitBtn.disabled = false;
-      }
-    });
-  }
-
-  // البحث السريع
   const searchInput = document.getElementById('searchInput');
   if(searchInput) {
     searchInput.addEventListener('input', (e) => {
