@@ -387,9 +387,11 @@ function listenToMerchantProducts(merchantId) {
   });
 }
 
-// مراقبة المنتجات والمعرض العام
+// ===================== [التعديل هنا: مراقبة المنتجات والمعرض العام مع الفلتر] =====================
 let allProducts = [];
-onSnapshot(collection(db, "products"), (snapshot) => {
+const webProductsQuery = query(collection(db, "products"), where("syncToWeb", "==", true));
+
+onSnapshot(webProductsQuery, (snapshot) => {
   allProducts = [];
   snapshot.forEach(docSnap => {
     allProducts.push({ id: docSnap.id, ...docSnap.data() });
