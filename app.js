@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ===================== [إضافة تاجر جديد - النسخة الأوتوماتيكية الكاملة] =====================
+  // ===================== [إضافة تاجر جديد] =====================
   if(addMerchantSubmitBtn) {
     addMerchantSubmitBtn.addEventListener('click', async () => {
       const name = document.getElementById('newMerchantName').value.trim();
@@ -165,31 +165,25 @@ document.addEventListener("DOMContentLoaded", () => {
         addMerchantSubmitBtn.disabled = true;
         addMerchantSubmitBtn.textContent = "جاري إنشاء الحساب...";
 
-        // 1. إنشاء الحساب في الـ Auth باستخدام التطبيق الفرعي (حتى لا يخرج الأدمن)
         const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
         const newMerchantUser = userCredential.user;
         const merchantUid = newMerchantUser.uid;
 
-        // 2. تسجيل بيانات التاجر في الـ Firestore باستخدام الـ UID الحقيقي بتاعه فوراً
         await setDoc(doc(db, "merchants", merchantUid), {
           id: merchantUid,
           name: name,
           email: email,
-          password: password, // اختياري للعلم فقط
+          password: password,
           whatsapp: GLOBAL_WHATSAPP,
           createdAt: new Date().toISOString()
         });
 
-        // 3. تسجيل خروج تلقائي للتطبيق الفرعي حتى ينظف الذاكرة ولا يتدخل في التطبيق الرئيسي
         await signOut(secondaryAuth);
-
         showToast(`تم إنشاء حساب التاجر (${name}) بنجاح وبشكل تلقائي! 🎉`);
         
-        // تفريغ الحقول
         document.getElementById('newMerchantName').value = '';
         document.getElementById('newMerchantEmail').value = '';
         document.getElementById('newMerchantPassword').value = '';
-        if(document.getElementById('newMerchantWhatsapp')) document.getElementById('newMerchantWhatsapp').value = '';
 
       } catch (error) {
         console.error("خطأ إنشاء التاجر:", error);
@@ -205,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ===================== [إضافة منتج جديد] =====================
+  // ===================== [إضافة منتج جديد متوافق وسحابي 100%] =====================
   if(addProductSubmitBtn) {
     addProductSubmitBtn.addEventListener('click', async () => {
       const name = document.getElementById('newProductName').value.trim();
@@ -225,12 +219,18 @@ document.addEventListener("DOMContentLoaded", () => {
         addProductSubmitBtn.disabled = true;
         addProductSubmitBtn.textContent = "جاري الرفع...";
 
-        await addDoc(collection(db, "products"), {
+        // 🎯 توليد كود موحد عبارة عن 8 أرقام فقط (بدون حروف) لسهولة الاستخدام كباركود
+        const productCode = Math.floor(10000000 + Math.random() * 90000000).toString();
+
+        // 🎯 التعديل الجوهري: استخدام setDoc لتثبيت معرّف الكود، وإضافة الختم السحابي ليظهر في الموقع
+        await setDoc(doc(db, "products", productCode), {
+          code: productCode,
           name: name,
-          price: price,
+          price: price.toString(),
           desc: desc,
           img: img,
-          stock: stock,
+          stock: stock.toString(),
+          syncToWeb: true, // تفعيل الختم إجبارياً ليظهر فوراً في معرض الموقع
           merchantId: mId,
           merchantName: currentMerchantName,
           merchantWhatsapp: GLOBAL_WHATSAPP, 
@@ -387,7 +387,7 @@ function listenToMerchantProducts(merchantId) {
   });
 }
 
-// ===================== [التعديل هنا: مراقبة المنتجات والمعرض العام مع الفلتر] =====================
+// مراقبة المنتجات والمعرض العام مع الفلتر السحابي
 let allProducts = [];
 const webProductsQuery = query(collection(db, "products"), where("syncToWeb", "==", true));
 
