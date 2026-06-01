@@ -28,7 +28,13 @@ const GLOBAL_WHATSAPP = "201015409872";
 
 let currentMerchantId = localStorage.getItem('merchantId') || null;
 let currentMerchantName = localStorage.getItem('merchantName') || "تاجر نادر ستور";
+let currentMerchantWhatsapp = localStorage.getItem('merchantWhatsapp') || GLOBAL_WHATSAPP;
 
+/**
+ * Displays a temporary toast notification message on the screen.
+ * @param {string} msg - The message text to display.
+ * @param {boolean} [isError=false] - Whether the message is an error notification.
+ */
 function showToast(msg, isError = false) {
   const t = document.getElementById('toast');
   if(t) {
@@ -39,6 +45,10 @@ function showToast(msg, isError = false) {
   }
 }
 
+/**
+ * Switches the active screen display between store, admin, and merchant panels.
+ * @param {string} screenName - The name of the target screen to display ('store', 'admin', 'merchant').
+ */
 window.showScreen = function(screenName) {
   const screens = { store: document.getElementById('screenStore'), admin: document.getElementById('screenAdmin'), merchant: document.getElementById('screenMerchant') };
   const navActions = document.getElementById('navActions');
@@ -58,6 +68,9 @@ window.showScreen = function(screenName) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+/**
+ * Toggles the visibility of product size inventory fields based on the selected size type.
+ */
 window.toggleSizeFields = function() {
     const type = document.getElementById('newProductSizeType').value;
     document.getElementById('fieldOneSize').classList.add('hidden');
@@ -71,8 +84,24 @@ window.toggleSizeFields = function() {
 
 // ===================== [عربة التسوق] =====================
 window.webCart = JSON.parse(localStorage.getItem('naderWebCart')) || [];
+window.addEventListener('storage', (e) => {
+  if (e.key === 'naderWebCart') {
+    window.webCart = JSON.parse(localStorage.getItem('naderWebCart')) || [];
+    window.updateWebCartUI();
+  }
+});
+/**
+ * Saves the current cart items to localStorage and updates the cart UI.
+ */
 window.saveWebCart = function() { localStorage.setItem('naderWebCart', JSON.stringify(window.webCart)); window.updateWebCartUI(); }
 
+/**
+ * Adds an item to the shopping cart, handling size variants if applicable.
+ * @param {string} id - The product ID.
+ * @param {string} name - The product name.
+ * @param {number|string} price - The unit price of the product.
+ * @param {boolean} hasSizes - Whether the product has size variants.
+ */
 window.addToWebCart = function(id, name, price, hasSizes) {
   let selectedSize = '';
   if (hasSizes) {
@@ -89,13 +118,29 @@ window.addToWebCart = function(id, name, price, hasSizes) {
   document.getElementById('postAddModal').classList.add('open');
 }
 
+/**
+ * Closes the post-add-to-cart confirmation modal overlay.
+ */
 window.closePostAddModal = function() { document.getElementById('postAddModal').classList.remove('open'); }
+
+/**
+ * Closes the confirmation prompt modal and opens the main cart modal view.
+ */
 window.openCartFromPrompt = function() { window.closePostAddModal(); document.getElementById('cartModal').classList.add('open'); }
+
+/**
+ * Increments or decrements the quantity of a cart item, removing it if the quantity becomes 0.
+ * @param {string} cartId - The cart item unique identifier (includes size if applicable).
+ * @param {number} delta - The amount to change the quantity by (e.g. +1 or -1).
+ */
 window.updateWebCartQty = function(cartId, delta) {
   const item = window.webCart.find(item => item.cartId === cartId);
   if(item) { item.qty += delta; if(item.qty <= 0) { window.webCart = window.webCart.filter(i => i.cartId !== cartId); } window.saveWebCart(); }
 }
 
+/**
+ * Re-renders the shopping cart item list UI, updates total prices, and refreshes the cart count badge.
+ */
 window.updateWebCartUI = function() {
   const badge = document.getElementById('cartCountBadge');
   const container = document.getElementById('cartItemsContainer');
@@ -104,34 +149,95 @@ window.updateWebCartUI = function() {
 
   if(badge && container && totalEl) {
     container.innerHTML = '';
-    if(window.webCart.length === 0) { container.innerHTML = '<p class="text-center text-gray-500 py-8">السلة فارغة حالياً 🛒</p>'; } else {
+    if(window.webCart.length === 0) {
+      const emptyMsg = document.createElement('p');
+      emptyMsg.className = "text-center text-gray-500 py-8";
+      emptyMsg.textContent = "السلة فارغة حالياً 🛒";
+      container.appendChild(emptyMsg);
+    } else {
       window.webCart.forEach(item => {
         totalQty += item.qty; totalPrice += (item.price * item.qty);
-        container.innerHTML += `
-          <div class="flex justify-between items-center bg-[#10102b] p-3 rounded-xl border border-[rgba(0,212,255,0.1)]">
-            <div><h4 class="text-white text-sm font-bold truncate max-w-[160px]">${item.name}</h4><p class="text-cyan-400 text-xs font-black">${item.price} ج.م</p></div>
-            <div class="flex items-center gap-3 bg-[#0a0a1f] px-2 py-1 rounded-lg border border-gray-800">
-              <button onclick="updateWebCartQty('${item.cartId}', -1)" class="w-6 h-6 text-red-400 font-bold">-</button>
-              <span class="text-white font-bold text-sm w-4 text-center">${item.qty}</span>
-              <button onclick="updateWebCartQty('${item.cartId}', 1)" class="w-6 h-6 text-green-400 font-bold">+</button>
-            </div>
-          </div>`;
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = "flex justify-between items-center bg-[#10102b] p-3 rounded-xl border border-[rgba(0,212,255,0.1)]";
+
+        const detailsDiv = document.createElement('div');
+        
+        const nameH4 = document.createElement('h4');
+        nameH4.className = "text-white text-sm font-bold truncate max-w-[160px]";
+        nameH4.textContent = item.name;
+
+        const priceP = document.createElement('p');
+        priceP.className = "text-cyan-400 text-xs font-black";
+        priceP.textContent = `${item.price} ج.م`;
+
+        detailsDiv.appendChild(nameH4);
+        detailsDiv.appendChild(priceP);
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = "flex items-center gap-3 bg-[#0a0a1f] px-2 py-1 rounded-lg border border-gray-800";
+
+        const decBtn = document.createElement('button');
+        decBtn.className = "w-6 h-6 text-red-400 font-bold";
+        decBtn.textContent = "-";
+        decBtn.onclick = () => window.updateWebCartQty(item.cartId, -1);
+
+        const qtySpan = document.createElement('span');
+        qtySpan.className = "text-white font-bold text-sm w-4 text-center";
+        qtySpan.textContent = item.qty;
+
+        const incBtn = document.createElement('button');
+        incBtn.className = "w-6 h-6 text-green-400 font-bold";
+        incBtn.textContent = "+";
+        incBtn.onclick = () => window.updateWebCartQty(item.cartId, 1);
+
+        actionsDiv.appendChild(decBtn);
+        actionsDiv.appendChild(qtySpan);
+        actionsDiv.appendChild(incBtn);
+
+        itemDiv.appendChild(detailsDiv);
+        itemDiv.appendChild(actionsDiv);
+
+        container.appendChild(itemDiv);
       });
     }
     badge.textContent = totalQty; totalEl.textContent = totalPrice.toFixed(2) + ' ج.م';
   }
 }
 
-window.checkoutWebCart = function() {
+/**
+ * Places the order by persisting it to Firestore and opening a pre-filled WhatsApp checkout link.
+ */
+window.checkoutWebCart = async function() {
   if(window.webCart.length === 0) { showToast("السلة فارغة!", true); return; }
   let msg = "أهلاً Nader Store، أريد تأكيد هذا الطلب:\n\n"; let total = 0;
   window.webCart.forEach((item, index) => { msg += `🛍️ ${index + 1}- ${item.name}\nالكمية: ${item.qty} | السعر: ${item.price * item.qty} ج.م\n\n`; total += (item.price * item.qty); });
   msg += `=================\n💰 الإجمالي المطلوب: ${total.toFixed(2)} ج.م\n\nهل البضاعة متوفرة؟`;
+  
   window.open(`https://wa.me/${GLOBAL_WHATSAPP}?text=${encodeURIComponent(msg)}`, '_blank');
-  window.webCart = []; window.saveWebCart(); document.getElementById('cartModal').classList.remove('open');
+
+  try {
+    await addDoc(collection(db, "orders"), {
+      items: window.webCart,
+      total: total,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      whatsapp: GLOBAL_WHATSAPP
+    });
+    window.webCart = [];
+    window.saveWebCart();
+    document.getElementById('cartModal').classList.remove('open');
+  } catch (error) {
+    console.error("Error saving order to Firestore:", error);
+    showToast("فشل حفظ الطلب في قاعدة البيانات", true);
+  }
 }
 
 // ===================== [فتح نافذة التعديل الذكية للمنتج] =====================
+/**
+ * Opens the product editing modal and populates it with the existing product and size variants information.
+ * @param {Object} prod - The product data object from database.
+ */
 window.openEditProductModal = function(prod) {
   document.getElementById('editProdCode').value = prod.code;
   document.getElementById('editProdName').value = prod.name;
@@ -204,7 +310,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if (docSnap.exists()) {
             localStorage.setItem('merchantId', userCred.user.uid);
             localStorage.setItem('merchantName', docSnap.data().name);
-            currentMerchantId = userCred.user.uid; currentMerchantName = docSnap.data().name;
+            localStorage.setItem('merchantWhatsapp', docSnap.data().whatsapp || GLOBAL_WHATSAPP);
+            currentMerchantId = userCred.user.uid;
+            currentMerchantName = docSnap.data().name;
+            currentMerchantWhatsapp = docSnap.data().whatsapp || GLOBAL_WHATSAPP;
           }
         }
         document.getElementById('loginModal').classList.remove('open');
@@ -279,6 +388,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const img = document.getElementById('newProductImage').value.trim() || "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500";
       if (!name || !price || !desc) { showToast("يرجى ملء الحقول الإلزامية *", true); return; }
 
+      if (name.length < 3) {
+        showToast("اسم المنتج يجب أن يكون على الأقل 3 حروف", true);
+        return;
+      }
+
+      const parsedPrice = parseFloat(price);
+      if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        showToast("السعر يجب أن يكون أكبر من 0", true);
+        return;
+      }
+
+      if (!img.startsWith("http://") && !img.startsWith("https://")) {
+        showToast("رابط الصورة يجب أن يبدأ بـ http:// أو https://", true);
+        return;
+      }
+
       let stock = 0; let sizesData = { type: 'none', variants: [] };
       const sizeType = document.getElementById('newProductSizeType').value;
 
@@ -301,13 +426,93 @@ document.addEventListener("DOMContentLoaded", () => {
         const secureMerchantId = auth.currentUser ? auth.currentUser.uid : (currentMerchantId || "offline_vendor");
         const secureMerchantName = currentMerchantName || "تاجر نادر ستور";
 
+        let secureMerchantWhatsapp = currentMerchantWhatsapp || GLOBAL_WHATSAPP;
+        if (auth.currentUser) {
+          try {
+            const mDoc = await getDoc(doc(db, "merchants", auth.currentUser.uid));
+            if (mDoc.exists()) {
+              secureMerchantWhatsapp = mDoc.data().whatsapp || GLOBAL_WHATSAPP;
+            }
+          } catch (e) {
+            console.error("Error fetching merchant whatsapp from DB:", e);
+          }
+        }
         await setDoc(doc(db, "products", productCode), {
-          code: productCode, name: name, price: price.toString(), desc: desc, img: img, stock: stock.toString(), sizes: sizesData, syncToWeb: true, merchantId: secureMerchantId, merchantName: secureMerchantName, merchantWhatsapp: GLOBAL_WHATSAPP, createdAt: new Date().toISOString()
+          code: productCode, name: name, price: price.toString(), desc: desc, img: img, stock: stock.toString(), sizes: sizesData, syncToWeb: true, merchantId: secureMerchantId, merchantName: secureMerchantName, merchantWhatsapp: secureMerchantWhatsapp, createdAt: new Date().toISOString()
         });
         showToast("تم حفظ المنتج ومقاساته بنجاح 🎉");
         document.getElementById('newProductName').value = ''; document.getElementById('newProductPrice').value = ''; document.getElementById('newProductDesc').value = ''; document.getElementById('qty_Numbers').value = '';
         ['S','M','L','XL','XXL'].forEach(l => document.getElementById('qty_'+l).value = '0');
       } catch (error) { showToast("فشل إضافة المنتج", true); } finally { addProductSubmitBtn.textContent = "حفظ وإضافة للمتجر 🚀"; }
+    });
+  }
+
+  // إضافة تاجر جديد (لوحة الأدمن)
+  if(addMerchantSubmitBtn) {
+    addMerchantSubmitBtn.addEventListener('click', async () => {
+      const name = document.getElementById('newMerchantName').value.trim();
+      const email = document.getElementById('newMerchantEmail').value.trim();
+      const password = document.getElementById('newMerchantPassword').value;
+      const whatsapp = document.getElementById('newMerchantWhatsapp').value.trim();
+
+      if (!name || !email || !password || !whatsapp) {
+        showToast("يرجى ملء كافة حقول التاجر الجديدة", true);
+        return;
+      }
+
+      try {
+        addMerchantSubmitBtn.textContent = "جاري الإضافة...";
+        const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        const uid = userCred.user.uid;
+
+        try {
+          // حفظ بيانات التاجر في Firestore
+          await setDoc(doc(db, "merchants", uid), {
+            uid: uid,
+            name: name,
+            email: email,
+            whatsapp: whatsapp,
+            createdAt: new Date().toISOString()
+          });
+        } catch (dbError) {
+          console.error("Firestore write failed, rolling back created auth user:", dbError);
+          try {
+            if (userCred && userCred.user) {
+              await userCred.user.delete();
+            }
+          } catch (deleteError) {
+            console.error("Failed to delete user during rollback:", deleteError);
+          }
+          try {
+            await signOut(secondaryAuth);
+          } catch (signOutError) {
+            console.error("Failed to sign out secondaryAuth during rollback:", signOutError);
+          }
+          throw dbError;
+        }
+
+        // تسجيل الخروج من الحساب الفرعي حتى لا يؤثر على جلسة الأدمن
+        await signOut(secondaryAuth);
+
+        showToast("تم إضافة التاجر بنجاح 🎉");
+        document.getElementById('newMerchantName').value = '';
+        document.getElementById('newMerchantEmail').value = '';
+        document.getElementById('newMerchantPassword').value = '';
+        document.getElementById('newMerchantWhatsapp').value = '';
+      } catch (error) {
+        showToast("فشل إضافة التاجر: " + error.message, true);
+      } finally {
+        addMerchantSubmitBtn.textContent = "إضافة التاجر ←";
+      }
+    });
+  }
+
+  // تفعيل قائمة الهامبرغر للجوال
+  const hamburgerMenu = document.getElementById('hamburgerMenu');
+  const navActions = document.getElementById('navActions');
+  if (hamburgerMenu && navActions) {
+    hamburgerMenu.addEventListener('click', () => {
+      navActions.classList.toggle('mobile-open');
     });
   }
 });
@@ -316,11 +521,38 @@ onAuthStateChanged(auth, async (user) => {
   const navLogin = document.getElementById('navLogin'), navLogout = document.getElementById('navLogout'), navStore = document.getElementById('navStore'), userBadge = document.getElementById('userBadge');
   if (user) {
     if(navLogin) navLogin.classList.add('hidden'); if(navLogout) navLogout.classList.remove('hidden'); if(navStore) navStore.classList.remove('hidden'); if(userBadge) userBadge.classList.remove('hidden');
-    if (user.email === ADMIN_EMAIL) { if(userBadge) userBadge.textContent = "أدمن"; showScreen('admin'); } else { if(userBadge) userBadge.textContent = currentMerchantName; showScreen('merchant'); listenToMerchantProducts(user.uid); }
+    if (user.email === ADMIN_EMAIL) {
+      if(userBadge) userBadge.textContent = "أدمن";
+      showScreen('admin');
+    } else {
+      let mName = currentMerchantName || "تاجر نادر ستور";
+      try {
+        const docSnap = await getDoc(doc(db, "merchants", user.uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          mName = data.name;
+          localStorage.setItem('merchantId', user.uid);
+          localStorage.setItem('merchantName', mName);
+          localStorage.setItem('merchantWhatsapp', data.whatsapp || GLOBAL_WHATSAPP);
+          currentMerchantId = user.uid;
+          currentMerchantName = mName;
+          currentMerchantWhatsapp = data.whatsapp || GLOBAL_WHATSAPP;
+        }
+      } catch (err) {
+        console.error("Error fetching merchant data:", err);
+      }
+      if(userBadge) userBadge.textContent = mName;
+      showScreen('merchant');
+      listenToMerchantProducts(user.uid);
+    }
   } else { currentMerchantId = null; showScreen('store'); }
 });
 
 // ===================== [دالة مراقبة وعرض منتجات التاجر مع زر التعديل الجديد] =====================
+/**
+ * Establishes a real-time Firestore listener to fetch and render the product list for the current merchant.
+ * @param {string} merchantId - The unique ID of the merchant.
+ */
 function listenToMerchantProducts(merchantId) {
   const q = query(collection(db, "products"), where("merchantId", "==", merchantId));
   const list = document.getElementById('merchantProductsList');
@@ -362,8 +594,16 @@ onSnapshot(query(collection(db, "products"), where("syncToWeb", "==", true)), (s
   renderProductsList(allProducts);
 });
 
+/**
+ * Renders the products grid on the customer-facing store page.
+ * @param {Array<Object>} products - Array of product objects.
+ */
 function renderProductsList(products) {
   const grid = document.getElementById('productsGrid'), noProducts = document.getElementById('noProducts');
+  const productCountEl = document.getElementById('productCount');
+  if (productCountEl) {
+    productCountEl.textContent = `${products.length} منتج`;
+  }
   if(!grid) return; grid.innerHTML = '';
   if (products.length === 0) { if(noProducts) noProducts.classList.remove('hidden'); return; }
   if(noProducts) noProducts.classList.add('hidden');
@@ -375,11 +615,18 @@ function renderProductsList(products) {
     let sizeSelectorHtml = ''; let hasSizes = false;
     if (p.sizes && p.sizes.type !== 'none' && p.sizes.variants && p.sizes.variants.length > 0) {
         hasSizes = true;
-        sizeSelectorHtml = `<select id="sizeSelect_${p.id}" class="w-full bg-[#1a1a4a] text-white border border-cyan-500/30 rounded-lg text-xs mb-3 p-2 outline-none focus:border-cyan-400"><option value="" disabled selected>📌 اختر المقاس المناسب...</option>${p.sizes.variants.map(v => `<option value="${v.size}">مقاس ${v.size} (${v.qty} متاح)</option>`).join('')}</select>`;
+        const variantsFiltered = p.sizes.variants.filter(v => v.qty > 0 || v.qty === 0);
+        sizeSelectorHtml = `<select id="sizeSelect_${p.id}" class="w-full bg-[#1a1a4a] text-white border border-cyan-500/30 rounded-lg text-xs mb-3 p-2 outline-none focus:border-cyan-400"><option value="" disabled selected>📌 اختر المقاس المناسب...</option>${variantsFiltered.map(v => {
+          if (v.qty > 0) {
+            return `<option value="${v.size}">مقاس ${v.size} (${v.qty} متاح)</option>`;
+          } else {
+            return `<option value="${v.size}" disabled>مقاس ${v.size} (نفذ المخزون)</option>`;
+          }
+        }).join('')}</select>`;
     }
 
     card.innerHTML = `
-      <div class="relative aspect-square overflow-hidden bg-slate-900"><img src="${p.img}" class="w-full h-full object-cover"></div>
+      <div class="relative aspect-square overflow-hidden bg-slate-900"><img src="${p.img}" loading="lazy" class="w-full h-full object-cover"></div>
       <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
         <div>
           <div class="flex items-center justify-between mb-1">
@@ -401,6 +648,10 @@ function renderProductsList(products) {
 // البحث السريع
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
   const word = e.target.value.toLowerCase().trim();
-  const filtered = allProducts.filter(p => p.name.toLowerCase().includes(word) || p.desc.toLowerCase().includes(word));
+  const filtered = allProducts.filter(p => 
+    p.name.toLowerCase().includes(word) || 
+    p.desc.toLowerCase().includes(word) || 
+    (p.merchantName && p.merchantName.toLowerCase().includes(word))
+  );
   renderProductsList(filtered);
 });
